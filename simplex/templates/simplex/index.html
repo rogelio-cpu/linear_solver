@@ -1,0 +1,49 @@
+{% extends 'simplex/base.html' %}
+
+{% block content %}
+<div class="container">
+    <h2>Simplex Method Solver</h2>
+    <p>Entrez votre problème de programmation linéaire ci-dessous.</p>
+
+    <!-- Formulaire du solveur -->
+    <div id="solver-app" class="card">
+        <form id="simplex-form">
+            {% csrf_token %}
+            <div class="form-group">
+                <label>Type de Fonction Objectif:</label>
+                <div class="radio-group">
+                    <label><input type="radio" name="maximize" value="true" checked> Maximiser</label>
+                    <label><input type="radio" name="maximize" value="false"> Minimiser</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="num-vars">Nombre de Variables:</label>
+                <input type="number" id="num-vars" min="1" max="10" value="2">
+            </div>
+
+            <div class="form-group">
+                <label for="num-constraints">Nombre de Contraintes:</label>
+                <input type="number" id="num-constraints" min="1" max="10" value="2">
+            </div>
+
+            <button type="button" id="generate-fields-btn" class="btn primary">Générer les Champs</button>
+
+            <div id="dynamic-inputs" style="display:none; margin-top: 20px;">
+                <h3>Fonction Objectif (Z)</h3>
+                <div id="objective-function-inputs" class="equation-inputs"></div>
+
+                <h3>Contraintes</h3>
+                <div id="constraints-inputs"></div>
+
+                <button type="submit" id="solve-btn" class="btn success" style="margin-top: 20px;">Résoudre</button>
+            </div>
+        </form>
+
+        <div id="results-area" style="display:none; margin-top: 30px;">
+            <h3>Résultats</h3>
+            <div id="results-content"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}

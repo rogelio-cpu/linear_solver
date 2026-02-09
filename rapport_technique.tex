@@ -1,0 +1,334 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows, positioning}
+
+\geometry{margin=2.5cm}
+
+% Code listing style
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{blue},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2,
+    frame=single
+}
+\lstset{style=mystyle}
+
+\title{\textbf{Rapport Technique}\\\Large Solveur de Programmation Linéaire\\Méthode du Simplex à Deux Phases}
+\author{Projet Django - Application Web}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+% ============================================
+\section{Vue d'Ensemble du Programme}
+% ============================================
+
+Ce programme est une application web Django qui résout des problèmes de \textbf{programmation linéaire} en utilisant la \textbf{méthode du Simplex à deux phases}. L'utilisateur entre un problème via une interface web, et le système calcule la solution optimale en affichant chaque étape du processus.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[node distance=2cm, auto,
+    block/.style={rectangle, draw, fill=blue!20, text width=3cm, text centered, rounded corners, minimum height=1cm},
+    arrow/.style={->, thick, >=stealth}]
+    
+    \node[block] (ui) {Interface Web};
+    \node[block, right of=ui, node distance=4cm] (views) {Django Views};
+    \node[block, right of=views, node distance=4cm] (solver) {Two-Phase Solver};
+    \node[block, below of=solver, node distance=2cm] (json) {Résultat JSON};
+    \node[block, left of=json, node distance=4cm] (display) {Affichage Résultats};
+    
+    \draw[arrow] (ui) -- (views);
+    \draw[arrow] (views) -- (solver);
+    \draw[arrow] (solver) -- (json);
+    \draw[arrow] (json) -- (display);
+\end{tikzpicture}
+\caption{Flux de données du programme}
+\end{figure}
+
+% ============================================
+\section{L'Algorithme du Simplex}
+% ============================================
+
+\subsection{Principe de Base}
+
+La méthode du Simplex résout des problèmes de programmation linéaire de la forme :
+
+\begin{align}
+\text{Maximiser (ou Minimiser)} \quad & Z = c_1 x_1 + c_2 x_2 + \cdots + c_n x_n \\
+\text{Sous les contraintes} \quad & A_{i1} x_1 + A_{i2} x_2 + \cdots + A_{in} x_n \leq (\geq, =) b_i \\
+& x_j \geq 0 \quad \forall j
+\end{align}
+
+\subsection{Méthode à Deux Phases}
+
+\subsubsection{Phase 1 : Recherche d'une Solution de Base Réalisable}
+\begin{itemize}
+    \item Ajoute des \textbf{variables artificielles} pour les contraintes $\geq$ et $=$
+    \item Minimise la somme des variables artificielles ($W$)
+    \item Si $W = 0$, une base réalisable existe
+\end{itemize}
+
+\subsubsection{Phase 2 : Optimisation de la Fonction Objectif}
+\begin{itemize}
+    \item Utilise la base trouvée en Phase 1
+    \item Applique l'algorithme Simplex standard jusqu'à l'optimalité
+\end{itemize}
+
+\subsection{Étapes de l'Algorithme Simplex}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}cl@{}}
+\toprule
+\textbf{Étape} & \textbf{Description} \\
+\midrule
+1 & \textbf{Test d'optimalité} : Si tous les coûts réduits $\geq 0$ $\rightarrow$ OPTIMAL \\
+2 & \textbf{Variable entrante} : Choisir la colonne avec le coût réduit le plus négatif \\
+3 & \textbf{Test de non-borné} : Si tous les coefficients de la colonne $\leq 0$ $\rightarrow$ NON BORNÉ \\
+4 & \textbf{Variable sortante} : Test du ratio minimum : $\min(b_i / a_{ij})$ pour $a_{ij} > 0$ \\
+5 & \textbf{Pivot} : Opérations de ligne pour mettre à jour le tableau \\
+\bottomrule
+\end{tabular}
+\caption{Étapes de l'algorithme Simplex}
+\end{table}
+
+% ============================================
+\section{Architecture du Projet}
+% ============================================
+
+\begin{lstlisting}[language=bash, caption=Structure du projet]
+linear_solver/
+|-- linear_solver/           # Configuration Django
+|   |-- settings.py          # Parametres du projet
+|   |-- urls.py              # Routes principales
+|-- simplex/                  # Application principale
+|   |-- views.py             # Controleurs API
+|   |-- urls.py              # Routes de l'app
+|   |-- solvers/             # Algorithmes
+|   |   |-- two_phase_solver.py  # Implementation Simplex
+|   |-- utils/               # Utilitaires
+|   |   |-- validators.py    # Validation des entrees
+|   |   |-- formatters.py    # Formatage des resultats
+|   |-- templates/simplex/   # HTML
+|   |   |-- base.html        # Template de base
+|   |   |-- index.html       # Interface principale
+|   |-- static/simplex/      # Ressources statiques
+|       |-- css/main.css     # Styles
+|       |-- js/main.js       # Logique frontend
+|-- manage.py
+\end{lstlisting}
+
+% ============================================
+\section{Fichiers Clés et Leur Rôle}
+% ============================================
+
+\subsection{two\_phase\_solver.py}
+
+\textbf{Rôle} : Cœur de l'algorithme - implémente la méthode du Simplex à deux phases.
+
+\begin{lstlisting}[language=Python, caption=Structure de TwoPhaseSolver]
+class TwoPhaseSolver:
+    def solve(self, c, A, b, signs):
+        # 1. Standardisation du probleme
+        # 2. Ajout des variables d'ecart/surplus/artificielles
+        # 3. Phase 1 (si necessaire)
+        # 4. Phase 2 (optimisation)
+        # 5. Extraction de la solution
+    
+    def _simplex_algorithm(self, A, b, c, basis_indices, phase):
+        # Boucle principale du Simplex
+        # - Test d'optimalite
+        # - Selection variable entrante/sortante
+        # - Operation de pivot
+\end{lstlisting}
+
+\subsection{views.py}
+
+\textbf{Rôle} : Gère les requêtes HTTP et orchestre le solveur.
+
+\begin{lstlisting}[language=Python, caption=Fonction solve\_problem]
+def solve_problem(request):
+    # 1. Parse JSON du frontend
+    # 2. Valide les entrees
+    # 3. Appelle TwoPhaseSolver.solve()
+    # 4. Retourne le resultat en JSON
+\end{lstlisting}
+
+\subsection{main.js}
+
+\textbf{Rôle} : Interface utilisateur et communication avec le backend.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Fonction} & \textbf{Description} \\
+\midrule
+\texttt{generateBtn.click()} & Génère les champs dynamiques \\
+\texttt{simplexForm.submit()} & Collecte les données et envoie au serveur \\
+\texttt{displayResults()} & Affiche la solution et les tableaux \\
+\bottomrule
+\end{tabular}
+\caption{Fonctions principales de main.js}
+\end{table}
+
+% ============================================
+\section{Transcription du Problème}
+% ============================================
+
+\subsection{Entrée Utilisateur vers Structure de Données}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Champ UI} & \textbf{Variable Python} & \textbf{Type} \\
+\midrule
+Coefficients objectif & \texttt{c} & \texttt{np.array([c$_1$, c$_2$, ...])} \\
+Matrice contraintes & \texttt{A} & \texttt{np.array([[a$_{11}$, a$_{12}$], ...])} \\
+Membres de droite & \texttt{b} & \texttt{np.array([b$_1$, b$_2$, ...])} \\
+Signes contraintes & \texttt{signs} & \texttt{['<=', '>=', '=']} \\
+\bottomrule
+\end{tabular}
+\caption{Correspondance entrée/données}
+\end{table}
+
+\subsection{Standardisation}
+
+Pour chaque contrainte, selon le signe :
+
+\begin{itemize}
+    \item \textbf{$\leq$} : Ajouter variable d'écart $(+s)$
+    \item \textbf{$\geq$} : Soustraire surplus $(-e)$, ajouter artificielle $(+a)$
+    \item \textbf{$=$} : Ajouter artificielle $(+a)$
+\end{itemize}
+
+\subsection{Structure du Tableau Simplex}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}c|cccc|c@{}}
+\toprule
+\textbf{Base} & $x_1$ & $x_2$ & $s_1$ & $s_2$ & \textbf{RHS} \\
+\midrule
+Contrainte 1 & $a_{11}$ & $a_{12}$ & 1 & 0 & $b_1$ \\
+Contrainte 2 & $a_{21}$ & $a_{22}$ & 0 & 1 & $b_2$ \\
+\midrule
+\textbf{Z} & $c_1 - z_1$ & $c_2 - z_2$ & 0 & 0 & $-z_0$ \\
+\bottomrule
+\end{tabular}
+\caption{Structure générale du tableau Simplex}
+\end{table}
+
+% ============================================
+\section{Exemple Concret}
+% ============================================
+
+\subsection{Problème}
+
+\begin{align*}
+\text{Maximiser} \quad & Z = 3x_1 + 4x_2 \\
+\text{Sous contraintes} \quad & x_1 + 7x_2 \leq 1200 \\
+& 7x_1 + x_2 \leq 1000 \\
+& x_1, x_2 \geq 0
+\end{align*}
+
+\subsection{Transcription Python}
+
+\begin{lstlisting}[language=Python]
+c = [3, 4]
+A = [[1, 7], [7, 1]]
+b = [1200, 1000]
+signs = ['<=', '<=']
+\end{lstlisting}
+
+\subsection{Tableau Initial}
+
+Après ajout des variables d'écart $s_1$ et $s_2$ :
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}c|cccc|c@{}}
+\toprule
+\textbf{Base} & $x_1$ & $x_2$ & $s_1$ & $s_2$ & \textbf{RHS} \\
+\midrule
+$s_1$ & 1 & 7 & 1 & 0 & 1200 \\
+$s_2$ & 7 & 1 & 0 & 1 & 1000 \\
+\midrule
+\textbf{Z} & $-3$ & $-4$ & 0 & 0 & 0 \\
+\bottomrule
+\end{tabular}
+\caption{Tableau Simplex initial}
+\end{table}
+
+\subsection{Solution Optimale}
+
+\begin{equation*}
+\boxed{x_1 \approx 120.83 \quad x_2 \approx 154.17 \quad Z \approx 979.17}
+\end{equation*}
+
+% ============================================
+\section{Technologies Utilisées}
+% ============================================
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Composant} & \textbf{Technologie} \\
+\midrule
+Backend & Django 4.2 (Python) \\
+Calcul matriciel & NumPy \\
+Frontend & HTML5, CSS3, JavaScript (Vanilla) \\
+Style & CSS custom (inspiré Tailwind) \\
+Communication & API REST (JSON) \\
+\bottomrule
+\end{tabular}
+\caption{Stack technologique}
+\end{table}
+
+% ============================================
+\section{Points Forts de l'Implémentation}
+% ============================================
+
+\begin{enumerate}
+    \item \textbf{Méthode à deux phases} : Gère tous types de contraintes ($\leq$, $\geq$, $=$)
+    \item \textbf{Itérations traçables} : Chaque étape est enregistrée et affichée
+    \item \textbf{Explications pédagogiques} : Textes explicatifs pour chaque phase
+    \item \textbf{Interface moderne} : Design responsive et animations fluides
+    \item \textbf{Validation robuste} : Vérification des entrées côté serveur
+\end{enumerate}
+
+\end{document}
